@@ -1,0 +1,15 @@
+{
+  "name": "cloudlens-monorepo",
+  "private": true,
+  "version": "1.0.0",
+  "description": "CloudLens FinOps Platform Monorepo",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.4"
+  },
+  "packageManager": "pnpm@10.34.4"
+}
