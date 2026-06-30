@@ -11,6 +11,11 @@ import {
   rotateCredentials,
 } from './services/supabase/accounts.repo.js';
 import { validateAWSCredentials } from './services/aws/sts.service.js';
+import { costsRoutes } from './routes/costs.routes.js';
+import { servicesRoutes } from './routes/services.routes.js';
+import { budgetsRoutes } from './routes/budgets.routes.js';
+import { controlsRoutes } from './routes/controls.routes.js';
+import { scheduledActionsRoutes } from './routes/scheduled-actions.routes.js';
 import { z } from 'zod';
 
 const fastify = Fastify({ logger: true });
@@ -19,6 +24,12 @@ await fastify.register(cors, {
   origin: '*',
   methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
 });
+
+await fastify.register(costsRoutes);
+await fastify.register(servicesRoutes);
+await fastify.register(budgetsRoutes);
+await fastify.register(controlsRoutes);
+await fastify.register(scheduledActionsRoutes);
 
 fastify.get('/health', async () => {
   return { status: 'OK' };
@@ -136,7 +147,7 @@ fastify.post('/api/accounts/:id/validate', async (request, reply) => {
     try {
       await updateAccountStatus(id, 'invalid', new Date());
     } catch (dbErr) {
-      fastify.log.error('Failed to update invalid status:', dbErr);
+      fastify.log.error('Failed to update invalid status:', dbErr as any);
     }
     return reply.status(400).send({ error: err.message || 'Validation failed' });
   }

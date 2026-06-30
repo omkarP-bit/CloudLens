@@ -9,7 +9,15 @@
     "start": "node dist/app.js"
   },
   "dependencies": {
+    "@aws-sdk/client-budgets": "^3.592.0",
+    "@aws-sdk/client-cost-explorer": "^3.592.0",
+    "@aws-sdk/client-ec2": "^3.592.0",
+    "@aws-sdk/client-ecs": "^3.592.0",
+    "@aws-sdk/client-elasticache": "^3.592.0",
     "@aws-sdk/client-kms": "^3.592.0",
+    "@aws-sdk/client-lambda": "^3.592.0",
+    "@aws-sdk/client-rds": "^3.592.0",
+    "@aws-sdk/client-s3": "^3.592.0",
     "@aws-sdk/client-sts": "^3.592.0",
     "@supabase/supabase-js": "^2.43.4",
     "fastify": "^4.27.0",

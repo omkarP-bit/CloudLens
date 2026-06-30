@@ -41,19 +41,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
 
     supabase.auth.onAuthStateChange(async (event, session) => {
-      set({ loading: true });
+      if (event === 'SIGNED_OUT') {
+        set({ user: null, role: null });
+        return;
+      }
+
       if (session?.user) {
         set({ user: session.user });
-        const { data: profile } = await supabase
-          .from('user_profiles')
-          .select('role')
-          .eq('id', session.user.id)
-          .single();
-        set({ role: (profile?.role as any) || 'viewer' });
-      } else {
-        set({ user: null, role: null });
+        if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+          const { data: profile } = await supabase
+            .from('user_profiles')
+            .select('role')
+            .eq('id', session.user.id)
+            .single();
+          set({ role: (profile?.role as any) || 'viewer' });
+        }
       }
-      set({ loading: false });
     });
   },
   signOut: async () => {

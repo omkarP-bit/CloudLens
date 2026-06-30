@@ -1,18 +1,19 @@
 import { useAWS } from '../../hooks/useAWS.js';
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
+import { useAccountStore } from '../../store/accountStore.js';
 import { CheckCircle, AlertTriangle } from 'lucide-react';
 
 export function Topbar() {
   const { accounts, isLoading } = useAWS();
-  const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+  const { activeAccountId, setActiveAccountId } = useAccountStore();
 
   useEffect(() => {
-    if (accounts.length > 0 && !selectedAccountId) {
-      setSelectedAccountId(accounts[0].id);
+    if (accounts.length > 0 && !activeAccountId) {
+      setActiveAccountId(accounts[0].id);
     }
-  }, [accounts, selectedAccountId]);
+  }, [accounts, activeAccountId, setActiveAccountId]);
 
-  const activeAccount = accounts.find((a) => a.id === selectedAccountId);
+  const activeAccount = accounts.find((a) => a.id === activeAccountId);
 
   return (
     <header className="h-16 border-b border-border bg-card/40 backdrop-blur flex items-center justify-between px-8 select-none">
@@ -25,8 +26,8 @@ export function Topbar() {
           <div className="flex items-center gap-3">
             <span className="text-xs text-zinc-400 font-medium">AWS Account:</span>
             <select
-              value={selectedAccountId}
-              onChange={(e) => setSelectedAccountId(e.target.value)}
+              value={activeAccountId || ''}
+              onChange={(e) => setActiveAccountId(e.target.value)}
               className="bg-zinc-900 border border-border text-white text-xs rounded-lg focus:ring-primary focus:border-primary block p-2 transition-all duration-200 outline-none"
             >
               {accounts.map((acc) => (
