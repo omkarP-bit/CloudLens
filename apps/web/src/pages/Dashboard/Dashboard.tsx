@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  TrendingUp, CreditCard, Sparkles, AlertCircle, Loader, Layers, XCircle,
+  TrendingUp, CreditCard, Sparkles, AlertCircle, Loader, Layers, XCircle, BadgeDollarSign, Eye, EyeOff,
 } from 'lucide-react';
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
 } from 'recharts';
 import { useAccountStore } from '../../store/accountStore.js';
@@ -15,6 +15,7 @@ import {
   useCostTrends,
   useServiceBreakdown,
   useTopServices,
+  useCostCredits,
 } from '../../hooks/useCosts.js';
 
 const DONUT_COLORS = [
@@ -25,9 +26,7 @@ const DONUT_COLORS = [
 
 function formatCurrency(n: number): string {
   return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
+    style: 'currency', currency: 'USD', minimumFractionDigits: 2,
   }).format(n);
 }
 
@@ -42,11 +41,13 @@ export function Dashboard() {
   const { accounts, isLoading: accountsLoading } = useAWS();
   const { activeAccountId } = useAccountStore();
   const [trendDays, setTrendDays] = useState(30);
+  const [showCredits, setShowCredits] = useState(true);
 
   const summary = useCostSummary(activeAccountId);
   const trends = useCostTrends(activeAccountId, trendDays);
   const breakdown = useServiceBreakdown(activeAccountId);
   const topServices = useTopServices(activeAccountId, 10);
+  const credits = useCostCredits(activeAccountId, trendDays);
 
   useEffect(() => {
     if (!activeAccountId) return;
@@ -55,29 +56,39 @@ export function Dashboard() {
       .channel('cost-updates')
       .on(
         'postgres_changes' as any,
-        {
-          event: '*',
-          schema: 'public',
-          table: 'cost_cache',
-          filter: `account_id=eq.${activeAccountId}`,
-        },
+        { event: '*', schema: 'public', table: 'cost_cache', filter: `account_id=eq.${activeAccountId}` },
         () => {
           queryClient.invalidateQueries({ queryKey: ['costs', 'summary', activeAccountId] });
           queryClient.invalidateQueries({ queryKey: ['costs', 'trends', activeAccountId] });
           queryClient.invalidateQueries({ queryKey: ['costs', 'breakdown', activeAccountId] });
           queryClient.invalidateQueries({ queryKey: ['costs', 'top-services', activeAccountId] });
+          queryClient.invalidateQueries({ queryKey: ['costs', 'credits', activeAccountId] });
         }
       )
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [activeAccountId, queryClient]);
 
-  const isLoading = summary.isLoading || trends.isLoading || breakdown.isLoading || topServices.isLoading;
+  const isLoading = summary.isLoading || trends.isLoading || breakdown.isLoading || topServices.isLoading || credits.isLoading;
 
-  const firstError = summary.error || trends.error || breakdown.error || topServices.error;
+  const firstError = summary.error || trends.error || breakdown.error || topServices.error || credits.error;
+
+  const chartData = useMemo(() => {
+    if (!trends.data) return [];
+    return trends.data.map((d) => {
+      const credit = credits.data?.dailyCredits?.find((c) => c.date === d.date);
+      const creditAmt = credit?.amount || 0;
+      return {
+        date: d.date,
+        amount: d.amount,
+        credits: creditAmt,
+        netAmount: Math.max(d.amount - creditAmt, 0),
+      };
+    });
+  }, [trends.data, credits.data]);
+
+  const netSpendMtd = (summary.data?.totalMtd ?? 0) - (credits.data?.totalCreditsMtd ?? 0);
 
   if (accountsLoading) {
     return (
@@ -154,10 +165,10 @@ export function Dashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="glass-panel p-6 rounded-xl flex flex-col justify-between h-36">
           <div className="flex items-center justify-between">
-            <span className="text-zinc-500 text-xs font-semibold uppercase tracking-wider">MTD Spend</span>
+            <span className="text-zinc-500 text-xs font-semibold uppercase tracking-wider">Gross Spend (MTD)</span>
             <CreditCard className="h-4.5 w-4.5 text-primary" />
           </div>
           <div>
@@ -165,7 +176,7 @@ export function Dashboard() {
               {formatCompact(summary.data?.totalMtd ?? 0)}
             </h2>
             <p className="text-[10px] text-zinc-500 mt-1">
-              MTD forecast: {formatCompact(summary.data?.forecastedMonthEnd ?? 0)}
+              Forecast: {formatCompact(summary.data?.forecastedMonthEnd ?? 0)}
             </p>
           </div>
         </div>
@@ -187,6 +198,21 @@ export function Dashboard() {
 
         <div className="glass-panel p-6 rounded-xl flex flex-col justify-between h-36">
           <div className="flex items-center justify-between">
+            <span className="text-zinc-500 text-xs font-semibold uppercase tracking-wider">Credits (MTD)</span>
+            <BadgeDollarSign className="h-4.5 w-4.5 text-success" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-black text-success">
+              {formatCompact(credits.data?.totalCreditsMtd ?? 0)}
+            </h2>
+            <p className="text-[10px] text-zinc-500 mt-1">
+              Net spend: {formatCompact(netSpendMtd)}
+            </p>
+          </div>
+        </div>
+
+        <div className="glass-panel p-6 rounded-xl flex flex-col justify-between h-36">
+          <div className="flex items-center justify-between">
             <span className="text-zinc-500 text-xs font-semibold uppercase tracking-wider">Anomalies Detected</span>
             <AlertCircle className="h-4.5 w-4.5 text-amber-500" />
           </div>
@@ -200,16 +226,30 @@ export function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         <div className="lg:col-span-3 glass-panel rounded-xl p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-white">Daily Spend Trend</h3>
+            <div className="flex items-center gap-3">
+              <h3 className="text-sm font-semibold text-white">
+                {showCredits ? 'Spend Trend (Gross vs Net)' : 'Daily Spend Trend'}
+              </h3>
+              <button
+                onClick={() => setShowCredits((v) => !v)}
+                className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium border transition-colors cursor-pointer ${
+                  showCredits
+                    ? 'bg-success/10 border-success/20 text-success'
+                    : 'bg-zinc-900 border-border text-zinc-500 hover:text-white'
+                }`}
+                title={showCredits ? 'Hide credits overlay' : 'Show credits overlay'}
+              >
+                {showCredits ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                <span>Credits</span>
+              </button>
+            </div>
             <div className="flex items-center gap-1 bg-zinc-900 border border-border rounded-lg p-0.5">
               {[30, 60, 90].map((d) => (
                 <button
                   key={d}
                   onClick={() => setTrendDays(d)}
                   className={`px-3 py-1 text-[11px] font-medium rounded-md transition-colors cursor-pointer ${
-                    trendDays === d
-                      ? 'bg-primary text-white'
-                      : 'text-zinc-400 hover:text-white'
+                    trendDays === d ? 'bg-primary text-white' : 'text-zinc-400 hover:text-white'
                   }`}
                 >
                   {d}D
@@ -219,41 +259,104 @@ export function Dashboard() {
           </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={trends.data ?? []}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                <XAxis
-                  dataKey="date"
-                  stroke="rgba(255,255,255,0.15)"
-                  tick={{ fontSize: 10, fill: 'rgba(255,255,255,0.3)' }}
-                  tickFormatter={(v: string) => {
-                    const d = new Date(v);
-                    return `${d.getMonth() + 1}/${d.getDate()}`;
-                  }}
-                />
-                <YAxis
-                  stroke="rgba(255,255,255,0.15)"
-                  tick={{ fontSize: 10, fill: 'rgba(255,255,255,0.3)' }}
-                  tickFormatter={(v: number) => `$${v}`}
-                />
-                <Tooltip
-                  contentStyle={{
-                    background: '#121215',
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                  }}
-                  labelStyle={{ color: '#f4f4f5' }}
-                  formatter={(value: number) => [formatCurrency(value), 'Spend']}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="amount"
-                  stroke="#6366f1"
-                  strokeWidth={2}
-                  dot={false}
-                  activeDot={{ r: 4, fill: '#6366f1' }}
-                />
-              </LineChart>
+              {showCredits ? (
+                <AreaChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                  <XAxis
+                    dataKey="date"
+                    stroke="rgba(255,255,255,0.15)"
+                    tick={{ fontSize: 10, fill: 'rgba(255,255,255,0.3)' }}
+                    tickFormatter={(v: string) => {
+                      const d = new Date(v);
+                      return `${d.getMonth() + 1}/${d.getDate()}`;
+                    }}
+                  />
+                  <YAxis
+                    stroke="rgba(255,255,255,0.15)"
+                    tick={{ fontSize: 10, fill: 'rgba(255,255,255,0.3)' }}
+                    tickFormatter={(v: number) => `$${v}`}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      background: '#121215',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                    }}
+                    labelStyle={{ color: '#f4f4f5' }}
+                    formatter={(value: number, name: string) => {
+                      const labels: Record<string, string> = { credits: 'Credits', netAmount: 'Net Spend', amount: 'Gross Spend' };
+                      return [formatCurrency(value), labels[name] || name];
+                    }}
+                  />
+                  <defs>
+                    <linearGradient id="creditGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="netGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0.05} />
+                    </linearGradient>
+                  </defs>
+                  <Area
+                    type="monotone"
+                    dataKey="netAmount"
+                    stackId="1"
+                    fill="url(#netGrad)"
+                    stroke="#6366f1"
+                    strokeWidth={2}
+                    dot={false}
+                    activeDot={{ r: 4, fill: '#6366f1' }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="credits"
+                    stackId="1"
+                    fill="url(#creditGrad)"
+                    stroke="#10b981"
+                    strokeWidth={1.5}
+                    strokeDasharray="4 3"
+                    dot={false}
+                  />
+                </AreaChart>
+              ) : (
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                  <XAxis
+                    dataKey="date"
+                    stroke="rgba(255,255,255,0.15)"
+                    tick={{ fontSize: 10, fill: 'rgba(255,255,255,0.3)' }}
+                    tickFormatter={(v: string) => {
+                      const d = new Date(v);
+                      return `${d.getMonth() + 1}/${d.getDate()}`;
+                    }}
+                  />
+                  <YAxis
+                    stroke="rgba(255,255,255,0.15)"
+                    tick={{ fontSize: 10, fill: 'rgba(255,255,255,0.3)' }}
+                    tickFormatter={(v: number) => `$${v}`}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      background: '#121215',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                    }}
+                    labelStyle={{ color: '#f4f4f5' }}
+                    formatter={(value: number) => [formatCurrency(value), 'Spend']}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="amount"
+                    stroke="#6366f1"
+                    strokeWidth={2}
+                    dot={false}
+                    activeDot={{ r: 4, fill: '#6366f1' }}
+                  />
+                </LineChart>
+              )}
             </ResponsiveContainer>
           </div>
         </div>
@@ -338,15 +441,9 @@ export function Dashboard() {
                     <td className="py-3 pr-4 text-right text-zinc-300">{formatCurrency(s.amount)}</td>
                     <td className="py-3 pr-4 text-right text-zinc-500">{formatCurrency(s.previousAmount)}</td>
                     <td className="py-3 pr-4 text-right">
-                      <span
-                        className={`font-semibold ${
-                          s.change > 0
-                            ? 'text-destructive'
-                            : s.change < 0
-                            ? 'text-success'
-                            : 'text-zinc-400'
-                        }`}
-                      >
+                      <span className={`font-semibold ${
+                        s.change > 0 ? 'text-destructive' : s.change < 0 ? 'text-success' : 'text-zinc-400'
+                      }`}>
                         {s.change > 0 ? '+' : ''}{s.change}%
                       </span>
                     </td>

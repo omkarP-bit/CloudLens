@@ -243,6 +243,91 @@ export async function getServiceBreakdown(
     .sort((a, b) => b.amount - a.amount);
 }
 
+export interface CreditSummary {
+  totalCreditsMtd: number;
+}
+
+export interface DailyCredit {
+  date: string;
+  amount: number;
+}
+
+const CREDIT_RECORD_TYPES = new Set(['Credit', 'Refund', 'Discount']);
+
+function extractCreditAmount(groups: { Keys?: string[]; Metrics?: Record<string, { Amount?: string }> }[]): number {
+  let total = 0;
+  for (const g of groups) {
+    if (g.Keys?.some((k) => CREDIT_RECORD_TYPES.has(k))) {
+      total += extractAmount(g.Metrics as any);
+    }
+  }
+  return Math.abs(total);
+}
+
+export async function getCredits(creds: AWSCredentials): Promise<CreditSummary> {
+  if (creds.accessKeyId.startsWith('mock_') || creds.secretAccessKey.startsWith('mock_')) {
+    return { totalCreditsMtd: 245.30 };
+  }
+
+  const start = firstOfMonth();
+  const end = today();
+
+  const groups = await fetchGroupedCost(creds, {
+    TimePeriod: { Start: start, End: end },
+    Granularity: 'MONTHLY',
+    Metrics: ['UnblendedCost'],
+    GroupBy: [{ Type: 'DIMENSION', Key: 'RECORD_TYPE' }],
+  });
+
+  let total = 0;
+  for (const g of groups) {
+    if (CREDIT_RECORD_TYPES.has(g.service)) {
+      total += Math.abs(g.amount);
+    }
+  }
+
+  return { totalCreditsMtd: Math.round(total * 100) / 100 };
+}
+
+export async function getDailyCredits(
+  creds: AWSCredentials,
+  days: number = 30
+): Promise<DailyCredit[]> {
+  if (creds.accessKeyId.startsWith('mock_') || creds.secretAccessKey.startsWith('mock_')) {
+    const now = new Date();
+    const data: DailyCredit[] = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      data.push({
+        date: formatDate(d),
+        amount: Math.round(Math.random() * 30 * 100) / 100,
+      });
+    }
+    return data;
+  }
+
+  const client = buildClient(creds);
+  const command = new GetCostAndUsageCommand({
+    TimePeriod: { Start: daysAgo(days), End: today() },
+    Granularity: 'DAILY',
+    Metrics: ['UnblendedCost'],
+    GroupBy: [{ Type: 'DIMENSION', Key: 'RECORD_TYPE' }],
+  });
+  const response = await client.send(command);
+
+  const credits: DailyCredit[] = [];
+  for (const period of response.ResultsByTime || []) {
+    if (!period.Groups) continue;
+    const creditAmt = extractCreditAmount(period.Groups);
+    if (creditAmt > 0) {
+      credits.push({ date: period.TimePeriod?.Start || '', amount: creditAmt });
+    }
+  }
+
+  return credits;
+}
+
 export async function getTopServices(
   creds: AWSCredentials,
   limit: number = 10

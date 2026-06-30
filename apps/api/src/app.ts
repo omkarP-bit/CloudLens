@@ -20,6 +20,10 @@ import { z } from 'zod';
 
 const fastify = Fastify({ logger: true });
 
+fastify.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body, done) => {
+  done(null, body ? JSON.parse(body as string) : {});
+});
+
 await fastify.register(cors, {
   origin: '*',
   methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
