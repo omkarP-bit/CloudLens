@@ -16,6 +16,7 @@ import { servicesRoutes } from './routes/services.routes.js';
 import { budgetsRoutes } from './routes/budgets.routes.js';
 import { controlsRoutes } from './routes/controls.routes.js';
 import { scheduledActionsRoutes } from './routes/scheduled-actions.routes.js';
+import { complianceRoutes } from './routes/compliance.routes.js';
 import { z } from 'zod';
 
 const fastify = Fastify({ logger: true });
@@ -34,6 +35,7 @@ await fastify.register(servicesRoutes);
 await fastify.register(budgetsRoutes);
 await fastify.register(controlsRoutes);
 await fastify.register(scheduledActionsRoutes);
+await fastify.register(complianceRoutes);
 
 fastify.get('/health', async () => {
   return { status: 'OK' };

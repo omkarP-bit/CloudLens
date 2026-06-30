@@ -1,5 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { env } from './env.js';
+import WebSocket from 'ws';
+
+globalThis.WebSocket = WebSocket as any;
 
 export const supabaseAdmin = createClient(
   env.SUPABASE_URL,
@@ -7,7 +10,7 @@ export const supabaseAdmin = createClient(
   {
     auth: {
       autoRefreshToken: false,
-      persistSession: false
-    }
+      persistSession: false,
+    },
   }
 );
