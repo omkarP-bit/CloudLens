@@ -10,6 +10,7 @@ import { budgetsRoutes } from './routes/budgets.routes.js';
 import { controlsRoutes } from './routes/controls.routes.js';
 import { scheduledActionsRoutes } from './routes/scheduled-actions.routes.js';
 import { complianceRoutes } from './routes/compliance.routes.js';
+import { terminalRoutes, attachTerminalWebSocket } from './routes/terminal.routes.js';
 import { z } from 'zod';
 const fastify = Fastify({ logger: true });
 fastify.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body, done) => {
@@ -25,6 +26,8 @@ await fastify.register(budgetsRoutes);
 await fastify.register(controlsRoutes);
 await fastify.register(scheduledActionsRoutes);
 await fastify.register(complianceRoutes);
+await fastify.register(terminalRoutes);
+const wss = attachTerminalWebSocket(fastify);
 fastify.get('/health', async () => {
     return { status: 'OK' };
 });
@@ -138,6 +141,9 @@ fastify.patch('/api/accounts/:id/credentials', async (request, reply) => {
         return reply.status(500).send({ error: 'Failed to rotate credentials' });
     }
 });
+setInterval(() => {
+    import('./services/terminal/terminal.service.js').then(m => m.cleanExpiredSessions());
+}, 60_000);
 const start = async () => {
     try {
         await fastify.listen({ port: env.PORT, host: '0.0.0.0' });

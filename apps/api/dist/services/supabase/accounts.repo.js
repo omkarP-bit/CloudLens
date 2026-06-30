@@ -24,7 +24,7 @@ export async function saveAccount(userId, alias, awsAccountId, roleArn, credenti
         encrypted_dek: encryptedDek,
         credential_type: credentialType,
         regions,
-        status: 'pending',
+        status: 'active',
     })
         .select()
         .single();
@@ -97,7 +97,7 @@ export async function rotateCredentials(userId, accountId, creds) {
         encrypted_session_token: encSessionToken ? JSON.stringify(encSessionToken) : null,
         encryption_key_id: env.KMS_CMK_ARN,
         encrypted_dek: encryptedDek,
-        status: 'pending',
+        status: 'active',
     })
         .eq('id', accountId)
         .eq('user_id', userId)
