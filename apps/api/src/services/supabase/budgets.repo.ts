@@ -35,6 +35,17 @@ export interface BudgetWithActuals extends Budget {
   percentUsed: number;
 }
 
+export async function listAllBudgets(): Promise<Budget[]> {
+  const { data, error } = await supabaseAdmin
+    .from('budgets')
+    .select('*')
+    .eq('is_template', false)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+}
+
 export async function listBudgets(userId: string, accountId?: string): Promise<Budget[]> {
   let query = supabaseAdmin
     .from('budgets')

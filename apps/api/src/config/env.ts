@@ -11,6 +11,12 @@ const envSchema = z.object({
   KMS_CMK_ARN: z.string().min(1),
   PORT: z.string().transform((val) => parseInt(val, 10)).default('8000'),
   REDIS_URL: z.string().optional(),
+  SMTP_HOST: z.string().default('smtp.gmail.com'),
+  SMTP_PORT: z.coerce.number().default(587),
+  SMTP_USER: z.string().default(''),
+  SMTP_PASS: z.string().default(''),
+  EMAIL_FROM: z.string().default('CloudLens Alerts <alerts@cloudlens.app>'),
+  SLACK_WEBHOOK_FALLBACK: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

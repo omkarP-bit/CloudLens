@@ -75,6 +75,30 @@ export async function getDecryptedCredentials(
   return { accessKeyId, secretAccessKey, sessionToken };
 }
 
+export interface Account {
+  id: string;
+  alias: string;
+  aws_account_id: string;
+  role_arn: string;
+  credential_type: string;
+  regions: string[];
+  status: string;
+  last_validated_at: string | null;
+  created_at: string;
+  updated_at: string;
+  user_id: string;
+}
+
+export async function listAllAccounts(): Promise<Account[]> {
+  const { data, error } = await supabaseAdmin
+    .from('aws_accounts')
+    .select('id, alias, aws_account_id, role_arn, credential_type, regions, status, last_validated_at, created_at, updated_at, user_id')
+    .eq('status', 'active');
+
+  if (error) throw error;
+  return data || [];
+}
+
 export async function listAccounts(userId: string) {
   const { data, error } = await supabaseAdmin
     .from('aws_accounts')

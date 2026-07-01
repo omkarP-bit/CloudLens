@@ -18,6 +18,7 @@ import { controlsRoutes } from './routes/controls.routes.js';
 import { scheduledActionsRoutes } from './routes/scheduled-actions.routes.js';
 import { complianceRoutes } from './routes/compliance.routes.js';
 import { terminalRoutes, attachTerminalWebSocket } from './routes/terminal.routes.js';
+import { notificationsRoutes } from './routes/notifications.routes.js';
 import { z } from 'zod';
 
 const fastify = Fastify({ logger: true });
@@ -38,6 +39,7 @@ await fastify.register(controlsRoutes);
 await fastify.register(scheduledActionsRoutes);
 await fastify.register(complianceRoutes);
 await fastify.register(terminalRoutes);
+await fastify.register(notificationsRoutes);
 
 const wss = attachTerminalWebSocket(fastify);
 
@@ -194,6 +196,14 @@ fastify.patch('/api/accounts/:id/credentials', async (request, reply) => {
 setInterval(() => {
   import('./services/terminal/terminal.service.js').then(m => m.cleanExpiredSessions());
 }, 60_000);
+
+setInterval(() => {
+  import('./services/notifications/sync-budget-actuals.service.js').then(m => m.syncBudgetActuals());
+}, 900_000);
+
+setInterval(() => {
+  import('./services/notifications/evaluator.service.js').then(m => m.evaluateBudgets());
+}, 300_000);
 
 const start = async () => {
   try {
